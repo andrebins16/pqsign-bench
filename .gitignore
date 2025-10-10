@@ -1,0 +1,14 @@
+extern/
+build/
+local/
+ossl-modules/
+logs/
+fixtures/
+tags/
+*.log
+plots/
+*.png
+results/
+*.csv
+*.json
+*.txt
