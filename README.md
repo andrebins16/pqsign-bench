@@ -200,7 +200,23 @@ Para cada gráfico gerado, é criado um arquivo .csv correspondente contendo ape
 Os comandos abaixo reproduzem exatamente os experimentos apresentados no trabalho.
 
 ### Ubuntu local:
+./scripts/ubuntu_00_setup_deps.sh
+
+./scripts/ubuntu_01_fetch_thirdparty.sh
+
+./scripts/ubuntu_02_build.sh
+
+sudo ./scripts/setup_cpu_performance.sh
+
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSUBUNTU
 
 ### Raspberry Pi 3B:
+./scripts/pi_00_setup_deps.sh
+
+./scripts/pi_01_fetch_thirdparty.sh
+
+./scripts/pi_02_build.sh
+
+sudo ./scripts/setup_cpu_performance.sh
+
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --sizes "256,10000,10000000" --timelimit 30 --walltimelimit 35
