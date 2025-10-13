@@ -52,6 +52,14 @@ Este repositório compila e executa benchmarks de algoritmos de assinatura digit
 
 # 2. Uso Básico
 
+## Configurar CPU para Benchmarking (Recomendado)
+
+Antes de executar benchmarks, configure a CPU para modo performance para reduzir variabilidade nos resultados e garantir reprodutibilidade:
+```
+# Executar UMA VEZ antes dos benchmarks (requer sudo)
+sudo ./scripts/setup_cpu_performance.sh
+```
+
 ## Opções do run_bench.sh:
 ```
 Uso: ./src/scripts/run_bench.sh SUBCOMANDO [opções]
