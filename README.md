@@ -76,7 +76,7 @@ Opções para 'run':
                          (default: "keygen,sign,verify,all")
   --reps N               Número de repetições (default: 100)
   --sizes "LISTA"        Tamanhos de mensagem em bytes, separados por vírgula (entre aspas)
-                         (default: "10000000"= 10MB)
+                         (default: "10000000, 100000000, 1000000000" = 10MB, 100MB, 1GB)
   --outdir DIR           Diretório de saída (default: $"${ROOT}/results")
   --outfile NOME.csv     Nome do arquivo CSV (default: results.csv)
   --trim-pct P           Percentual de trim para estatística (default: 15)
@@ -84,9 +84,9 @@ Opções para 'run':
                          (default: desabilitado) Recomendado ativar.
 
   Opções do runexec:
-  --timelimit VAL        Limite de tempo de CPU em segundos (default: 2s)
-  --walltimelimit VAL    Limite de tempo de parede em segundos (default: 3s)
-  --memlimit VAL         Limite de memória em bytes (default: 100663296 = 96 MB)
+  --timelimit VAL        Limite de tempo de CPU em segundos (default: 25s)
+  --walltimelimit VAL    Limite de tempo de parede em segundos (default: 30s)
+  --memlimit VAL         Limite de memória em bytes (default: 4294967296 = 4 GB)
   --cores "LISTA"        Lista de cores a usar (entre aspas se múltiplos)
                          Ex: 0 ou "0,2-3" (default: "0")
 
@@ -145,8 +145,6 @@ Métricas RAW: trim_wall_s_raw, std_wall_s_raw, trim_cpu_s_raw, std_cpu_s_raw, t
 Métricas BASELINE (se --baseline): trim_wall_s_base, std_wall_s_base, trim_cpu_s_base, std_cpu_s_base
 
 Métricas NET (RAW - BASELINE): net_wall_s, std_net_wall_s, net_cpu_s, std_net_cpu_s
-
-Falhas: failures_raw, failures_base
 
 RAW: medição completa (primitiva + overhead)
 
@@ -210,6 +208,8 @@ sudo ./scripts/setup_cpu_performance.sh
 
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSUBUNTU
 
+python3 src/plot.py FINALRESULTSUBUNTU
+
 ### Raspberry Pi 3B:
 ./scripts/pi_00_setup_deps.sh
 
@@ -220,3 +220,5 @@ src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSUBUNTU
 sudo ./scripts/setup_cpu_performance.sh
 
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --sizes "256,10000,10000000" --timelimit 30 --walltimelimit 35
+
+python src/plot.py FINALRESULTSBERRYPI

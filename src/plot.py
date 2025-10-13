@@ -45,10 +45,11 @@ def get_operation_title(op, size):
     if size == "-":
         return base_title
     else:
-        # Converte tamanho para formato legível (ex: 1000000 -> 1MB)
         try:
             size_bytes = int(size)
-            if size_bytes >= 1_000_000:
+            if size_bytes >= 1_000_000_000:
+                size_str = f"{size_bytes // 1_000_000_000}GB"
+            elif size_bytes >= 1_000_000:
                 size_str = f"{size_bytes // 1_000_000}MB"
             elif size_bytes >= 1_000:
                 size_str = f"{size_bytes // 1_000}KB"
@@ -71,6 +72,60 @@ def get_metric_suffix(metric_type):
     }
     return suffixes.get(metric_type, "")
 
+def get_algorithm_category(alg_name):
+    """
+    Retorna a categoria de um algoritmo baseado no nome
+    """
+    alg_lower = alg_name.lower()
+    
+    # Algoritmos Clássicos
+    if alg_lower in ['rsa', 'ec', 'ecdsa']:
+        return 'classical'
+    
+    # SPHINCS+
+    if 'sphincs' in alg_lower:
+        if '128' in alg_lower:
+            return 'nist1'
+        elif '192' in alg_lower:
+            return 'nist3'
+        elif '256' in alg_lower:
+            return 'nist5'
+    
+    # ML-DSA (Dilithium)
+    if alg_lower == 'mldsa44':
+        return 'nist2'  # Categoria 2 do NIST
+    elif alg_lower == 'mldsa65':
+        return 'nist3'  # Categoria 3 do NIST
+    elif alg_lower == 'mldsa87':
+        return 'nist5'  # Categoria 5 do NIST
+    
+    # Falcon
+    if alg_lower == 'falcon512':
+        return 'nist1'  # Categoria 1 do NIST
+    elif alg_lower == 'falcon1024':
+        return 'nist5'  # Categoria 5 do NIST
+    
+    # Padrão para algoritmos não mapeados
+    return 'other'
+
+def get_color_for_algorithm(alg_name):
+    """
+    Retorna a cor baseada na categoria do algoritmo
+    """
+    category = get_algorithm_category(alg_name)
+    
+    colors = {
+        'classical': '#E53935',    # Vermelho 
+        'nist1':     '#FB8C00',    # Laranja 
+        'nist2':     '#FDD835',    # Amarelo 
+        'nist3':     '#7CB342',    # Verde claro 
+        'nist5':     '#2E7D32',    # Verde escuro
+        'other':     '#9E9E9E'     # Cinza
+    }
+    
+    return colors.get(category, '#9E9E9E')
+
+
 def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, system_label=None):
     if sub_df.empty or value_col not in sub_df.columns:
         return
@@ -88,9 +143,12 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
 
     y = range(len(sub_df))
     errs = sub_df[err_col].fillna(0.0).values if err_col in sub_df.columns else [0.0] * len(sub_df)
+    
+    # Cores baseadas nos algoritmos
+    colors = [get_color_for_algorithm(alg) for alg in sub_df[ylabel_col].tolist()]
 
     fig, ax = plt.subplots(figsize=(10, max(6, len(sub_df) * 0.3)))
-    ax.barh(list(y), sub_df[value_col].values, xerr=errs, capsize=4)
+    ax.barh(list(y), sub_df[value_col].values, xerr=errs, capsize=4, color=colors, edgecolor='black', linewidth=0.5)
     ax.set_yticks(list(y))
     ax.set_yticklabels(sub_df[ylabel_col].tolist())
     ax.set_xlabel(xlabel)
@@ -105,6 +163,27 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
                 verticalalignment='bottom',
                 horizontalalignment='center',
                 color='gray')
+    
+    # Detecta quais categorias estão presentes no gráfico
+    categories_present = set(get_algorithm_category(alg) for alg in sub_df[ylabel_col].tolist())
+    
+    # Monta legenda apenas com categorias presentes (na ordem correta)
+    from matplotlib.patches import Patch
+    all_legend_elements = [
+        ('classical', Patch(facecolor='#E53935', edgecolor='black', label='Clássico (vulnerável)')),
+        ('nist1',     Patch(facecolor='#FB8C00', edgecolor='black', label='PQC Nível 1')),
+        ('nist2',     Patch(facecolor='#FDD835', edgecolor='black', label='PQC Nível 2')),
+        ('nist3',     Patch(facecolor='#7CB342', edgecolor='black', label='PQC Nível 3')),
+        ('nist5',     Patch(facecolor='#2E7D32', edgecolor='black', label='PQC Nível 5')),
+        ('other',     Patch(facecolor='#9E9E9E', edgecolor='black', label='Outros')),
+    ]
+    
+    # Filtra apenas as categorias presentes
+    legend_elements = [patch for cat, patch in all_legend_elements if cat in categories_present]
+    
+    # Só mostra legenda se houver elementos
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc='best', fontsize=8)
     
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
@@ -131,8 +210,6 @@ def write_subtable_csv(sub_df, alg_col, value_col, err_col, out_csv_path):
 def main():
     ap = argparse.ArgumentParser(description="Plota resultados do benchmark (RAW, opcional BASELINE/NET) a partir do CSV consolidado.")
     ap.add_argument("results_dir", help="Diretório contendo results.csv")
-    ap.add_argument("--drop-failed", action="store_true",
-                    help="Descarta linhas com failures_raw > 0 ou failures_base > 0")
     ap.add_argument("--time-unit", choices=["s", "ms"], default="ms",
                     help="Unidade para tempos (default: ms)")
     args = ap.parse_args()
@@ -171,17 +248,8 @@ def main():
         "net_wall_s","std_net_wall_s",
         "net_cpu_s","std_net_cpu_s",
         # MEM (RAW)
-        "trim_mem_mb","std_mem_mb",
-        # FAILS
-        "failures_raw","failures_base"
+        "trim_mem_mb","std_mem_mb"
     ])
-
-    # Opcional: remove combinações com falhas (raw e base, se existirem)
-    if args.drop_failed:
-        cond = (df["failures_raw"] == 0)
-        if "failures_base" in df.columns:
-            cond = cond & (df["failures_base"] == 0)
-        df = df[cond].copy()
 
     # Conversão de unidade para tempos
     t_factor = 1.0

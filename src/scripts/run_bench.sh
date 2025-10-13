@@ -26,9 +26,9 @@ TRIM_PCT_DEFAULT=15
 BASELINE_DEFAULT=0
 
 # Opções do runexec - Defaults para Ubuntu
-TIMELIMIT_DEFAULT="2"
-WALLTIMELIMIT_DEFAULT="3"
-MEMLIMIT_DEFAULT="100663296" # 96 MB em bytes (96 × 1024 × 1024)
+TIMELIMIT_DEFAULT="25"
+WALLTIMELIMIT_DEFAULT="30"
+MEMLIMIT_DEFAULT="4294967296" # 4GB
 CORES_DEFAULT="0"
 
 # Valores atuais (podem ser sobrescritos por CLI)
@@ -69,7 +69,7 @@ Opções para 'run':
                          (default: ${OPS_DEFAULT})
   --reps N               Número de repetições (default: ${REPS_DEFAULT})
   --sizes "LISTA"        Tamanhos de mensagem em bytes, separados por vírgula (entre aspas)
-                         (default: ${SIZES_DEFAULT} = 10MB)
+                         (default: ${SIZES_DEFAULT} = 10MB, 100MB, 1GB)
   --outdir DIR           Diretório de saída (default: ${OUTDIR_DEFAULT})
   --outfile NOME.csv     Nome do arquivo CSV (default: ${OUTFILE_DEFAULT})
   --trim-pct P           Percentual de trim para estatística (default: ${TRIM_PCT_DEFAULT})
@@ -79,7 +79,7 @@ Opções para 'run':
   Opções do runexec:
   --timelimit VAL        Limite de tempo de CPU em segundos (default: ${TIMELIMIT_DEFAULT}s)
   --walltimelimit VAL    Limite de tempo de parede em segundos (default: ${WALLTIMELIMIT_DEFAULT}s)
-  --memlimit VAL         Limite de memória em bytes (default: ${MEMLIMIT_DEFAULT} = 96 MB)
+  --memlimit VAL         Limite de memória em bytes (default: ${MEMLIMIT_DEFAULT} = 4GB)
   --cores "LISTA"        Lista de cores a usar (entre aspas se múltiplos)
                          Ex: 0 ou "0,2-3" (default: ${CORES_DEFAULT})
 
@@ -96,7 +96,7 @@ Exemplos:
   $(basename "$0") run --algs "mldsa44,falcon512" --reps 50
 
   # Benchmark completo com baseline e limites customizados
-  $(basename "$0") run --baseline --timelimit 5 --memlimit 134217728
+  $(basename "$0") run --baseline --timelimit 60 --memlimit 8589934592
 
   # Múltiplos tamanhos de mensagem
   $(basename "$0") run --sizes "1000000,5000000,10000000"
@@ -156,8 +156,6 @@ bc_init_providers_check() {
     "${WORKER}" list-algs >/dev/null 2>&1
 }
 
-
-
 # Subcomando: run
 # Gera fixtures (chave + assinatura) para um algoritmo e tamanho
 generate_fixture() {
@@ -197,14 +195,20 @@ run_single_benchmark() {
     fi
 
     # Extrai métricas dos outputs do runexec
-    local return_value wall_time cpu_time mem_bytes mem_mb
+    local return_value wall_time cpu_time mem_bytes mem_mb termination_reason
+    
     return_value="$( { grep -E '^returnvalue=' "$temp_stdout" "$temp_stderr" 2>/dev/null | tail -n1 | sed -E 's/.*=([0-9]+)/\1/'; } || true )"
+    
     wall_time="$( { grep -E '^walltime=' "$temp_stdout" "$temp_stderr" 2>/dev/null | tail -n1 | sed -E 's/.*=([0-9.]+)s/\1/'; } || true )"
     [[ -z "$wall_time" ]] && wall_time="$( { grep -E 'time\.wall(time)?[:=][ ]*[0-9.]+' "$temp_stdout" "$temp_stderr" 2>/dev/null | head -n1 | sed -E 's/.*[:=][ ]*([0-9.]+)/\1/'; } || true )"
+    
     cpu_time="$( { grep -E '^cputime=' "$temp_stdout" "$temp_stderr" 2>/dev/null | tail -n1 | sed -E 's/.*=([0-9.]+)s/\1/'; } || true )"
     [[ -z "$cpu_time" ]] && cpu_time="$( { grep -E 'time\.cpu(time)?[:=][ ]*[0-9.]+' "$temp_stdout" "$temp_stderr" 2>/dev/null | head -n1 | sed -E 's/.*[:=][ ]*([0-9.]+)/\1/'; } || true )"
+    
     mem_bytes="$( { grep -E '^memory=[0-9]+B' "$temp_stdout" "$temp_stderr" 2>/dev/null | tail -n1 | sed -E 's/.*=([0-9]+)B/\1/'; } || true )"
     [[ -z "$mem_bytes" ]] && mem_bytes="$( { grep -E 'memory\.peak[:=][ ]*[0-9]+' "$temp_stdout" "$temp_stderr" 2>/dev/null | head -n1 | sed -E 's/.*[:=][ ]*([0-9]+)/\1/'; } || true )"
+    
+    termination_reason="$( { grep -E '^terminationreason=' "$temp_stdout" "$temp_stderr" 2>/dev/null | tail -n1 | sed -E 's/.*=(.+)/\1/'; } || true )"
     
     if [[ -n "$mem_bytes" ]]; then
         mem_mb="$(awk -v bytes="$mem_bytes" 'BEGIN{ printf "%.6f", bytes/1000000.0 }')"
@@ -214,21 +218,46 @@ run_single_benchmark() {
 
     # Determina código de saída final
     local final_exit=0
-    if [[ "$runexec_exit" != "0" ]]; then
+    
+    if [[ -n "$termination_reason" && "$termination_reason" != "success" ]]; then
+        final_exit=1
+    elif [[ "$runexec_exit" != "0" ]]; then
         final_exit="$runexec_exit"
     elif [[ -n "$return_value" && "$return_value" != "0" ]]; then
         final_exit="$return_value"
     fi
 
-    # Debug em caso de erro
-    if [[ "$final_exit" != "0" && -n "${BENCH_VERBOSE:-}" ]]; then
-        echo "[debug] stderr do runexec (últimas 20 linhas):" >&2
+    # Se houve erro, mostra mensagem e aborta
+    if [[ "$final_exit" != "0" ]]; then
+        echo "" >&2
+        echo "--------------------------------------------------------------------------------------------------------------" >&2
+        echo "ERRO: Execução falhou" >&2
+        echo "--------------------------------------------------------------------------------------------------------------" >&2
+        echo "  Exit code         : ${final_exit}" >&2
+        echo "  Termination reason: ${termination_reason:-none}" >&2
+        echo "" >&2
+        echo "Limites do runexec:" >&2
+        echo "  --timelimit     : ${TIMELIMIT}s" >&2
+        echo "  --walltimelimit : ${WALLTIMELIMIT}s" >&2
+        echo "  --memlimit      : ${MEMLIMIT} bytes (~$((MEMLIMIT/1048576)) MB)" >&2
+        echo "" >&2
+        echo "Últimas 20 linhas do stderr do runexec:" >&2
         tail -n 20 "$temp_stderr" >&2 || true
+        echo "" >&2
+        echo "Possíveis soluções:" >&2
+        echo "  - Aumente --timelimit" >&2
+        echo "  - Aumente --walltimelimit" >&2
+        echo "  - Aumente --memlimit" >&2
+        echo "  - Reduza --sizes para mensagens menores" >&2
+        echo "  - Remova algoritmos problemáticos com --algs" >&2
+        echo "--------------------------------------------------------------------------------------------------------------" >&2
+        rm -f "$temp_stdout" "$temp_stderr"
+        exit 1
     fi
 
     rm -f "$temp_stdout" "$temp_stderr"
 
-    # Retorna valores (NaN se não coletado)
+    # Retorna valores
     [[ -z "$wall_time" ]] && wall_time="NaN"
     [[ -z "$cpu_time"  ]] && cpu_time="NaN"
     [[ -z "$mem_mb"    ]] && mem_mb="NaN"
@@ -312,11 +341,11 @@ calculate_statistics() {
 write_csv_header() {
     local csv_file="$1"
     if [[ ! -s "$csv_file" ]]; then
-        echo "algorithm,operation,size,reps,trim_pct,trim_wall_s_raw,std_wall_s_raw,trim_cpu_s_raw,std_cpu_s_raw,trim_wall_s_base,std_wall_s_base,trim_cpu_s_base,std_cpu_s_base,net_wall_s,std_net_wall_s,net_cpu_s,std_net_cpu_s,trim_mem_mb,std_mem_mb,failures_raw,failures_base" > "$csv_file"
+        echo "algorithm,operation,size,reps,trim_pct,trim_wall_s_raw,std_wall_s_raw,trim_cpu_s_raw,std_cpu_s_raw,trim_wall_s_base,std_wall_s_base,trim_cpu_s_base,std_cpu_s_base,net_wall_s,std_net_wall_s,net_cpu_s,std_net_cpu_s,trim_mem_mb,std_mem_mb" > "$csv_file"
     fi
 }
 
-# Calcula composição de incerteza (quadratura) - "dois desviso padroões se acumulam"
+# Calcula composição de incerteza (quadratura) - "dois desvios padrões se acumulam"
 calculate_quadrature_std() {
     local std_a="$1"
     local std_b="$2"
@@ -531,9 +560,6 @@ cmd_run() {
                 wall_file_raw="$(mktemp)"
                 cpu_file_raw="$(mktemp)"
                 mem_file_raw="$(mktemp)"
-                
-                local failures_raw=0
-                local failures_baseline=0
 
                 # Gera fixtures se necessário (sign/verify)
                 local key_b64="" sig_b64=""
@@ -568,7 +594,6 @@ cmd_run() {
 
                     read -r exit_code wall_time cpu_time mem_mb < <( run_single_benchmark "${cmd_args[@]}" )
                     
-                    [[ "$exit_code" != "0" ]] && ((failures_raw++))
                     [[ "$wall_time" =~ ^[0-9] ]] && echo "$wall_time" >> "$wall_file_raw"
                     [[ "$cpu_time"  =~ ^[0-9] ]] && echo "$cpu_time"  >> "$cpu_file_raw"
                     [[ "$mem_mb"    =~ ^[0-9] ]] && echo "$mem_mb"    >> "$mem_file_raw"
@@ -602,7 +627,6 @@ cmd_run() {
 
                         read -r exit_code wall_time cpu_time _ < <( run_single_benchmark "${cmd_args_baseline[@]}" )
                         
-                        [[ "$exit_code" != "0" ]] && ((failures_baseline++))
                         [[ "$wall_time" =~ ^[0-9] ]] && echo "$wall_time" >> "$wall_file_baseline"
                         [[ "$cpu_time"  =~ ^[0-9] ]] && echo "$cpu_time"  >> "$cpu_file_baseline"
                     done
@@ -637,7 +661,7 @@ cmd_run() {
                 fi
 
                 # Escreve linha no CSV
-                echo "${algorithm},${operation},${msg_size},${REPS},${TRIM_PCT},${mean_wall_raw},${std_wall_raw},${mean_cpu_raw},${std_cpu_raw},${mean_wall_baseline},${std_wall_baseline},${mean_cpu_baseline},${std_cpu_baseline},${net_wall},${std_net_wall},${net_cpu},${std_net_cpu},${mean_mem},${std_mem},${failures_raw},${failures_baseline}" >> "$result_csv"
+                echo "${algorithm},${operation},${msg_size},${REPS},${TRIM_PCT},${mean_wall_raw},${std_wall_raw},${mean_cpu_raw},${std_cpu_raw},${mean_wall_baseline},${std_wall_baseline},${mean_cpu_baseline},${std_cpu_baseline},${net_wall},${std_net_wall},${net_cpu},${std_net_cpu},${mean_mem},${std_mem}" >> "$result_csv"
 
                 # Limpeza de temporários
                 rm -f "$wall_file_raw" "$cpu_file_raw" "$mem_file_raw"
@@ -645,14 +669,18 @@ cmd_run() {
                     rm -f "$wall_file_baseline" "$cpu_file_baseline"
                 fi
 
-                echo "[benchmark] ${algorithm}/${operation}/${msg_size} -> repetições=${REPS} falhas_raw=${failures_raw} falhas_baseline=${failures_baseline}"
+                echo "[benchmark] ${algorithm}/${operation}/${msg_size} -> ${REPS} repetições"
             done
         done
     done
 
-    echo "[benchmark] Informações do sistema: ${system_json}"
-    echo "[benchmark] Resultados finais: ${result_csv}"
-    echo "[benchmark] Concluído com sucesso."
+    echo ""
+    echo "--------------------------------------------------------------------------------------------------------------"
+    echo " Benchmark concluído com SUCESSO"
+    echo "--------------------------------------------------------------------------------------------------------------"
+    echo "  Resultados : ${result_csv}"
+    echo "  Metadados  : ${system_json}"
+    echo "--------------------------------------------------------------------------------------------------------------"
 }
 
 # Parse de argumentos
