@@ -29,4 +29,4 @@ fi
 echo "[setup] Configuração atual:"
 echo "  Governor: $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
 
-echo "[setup] Pronto!
+echo "[setup] Pronto!"

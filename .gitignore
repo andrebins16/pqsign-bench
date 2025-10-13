@@ -11,4 +11,4 @@ plots/
 results/
 *.csv
 *.json
-*.txt
+*/system_label.txt
