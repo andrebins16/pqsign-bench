@@ -17,8 +17,8 @@ PREP="${BUILD_DIR}/bench_prep"
 
 # Defaults
 ALGS_DEFAULT="sphincsshake256ssimple,sphincsshake256fsimple,sphincsshake192ssimple,sphincsshake192fsimple,sphincsshake128ssimple,sphincsshake128fsimple,sphincssha2256ssimple,sphincssha2256fsimple,sphincssha2192ssimple,sphincssha2192fsimple,sphincssha2128ssimple,sphincssha2128fsimple,mldsa87,mldsa65,mldsa44,falcon512,falcon1024,RSA,EC"
-OPS_DEFAULT="all"
-REPS_DEFAULT=10
+OPS_DEFAULT="keygen,sign,verify,all"
+REPS_DEFAULT=100
 SIZES_DEFAULT="256,100000,100000000"
 OUTDIR_DEFAULT="${ROOT}/results"
 OUTFILE_DEFAULT="results.csv"
@@ -26,9 +26,9 @@ TRIM_PCT_DEFAULT=15
 BASELINE_DEFAULT=0
 
 # Opções do runexec - Defaults para Ubuntu
-TIMELIMIT_DEFAULT=""
-WALLTIMELIMIT_DEFAULT=""
-MEMLIMIT_DEFAULT="" # 4GB
+TIMELIMIT_DEFAULT="5"
+WALLTIMELIMIT_DEFAULT="6"
+MEMLIMIT_DEFAULT="500000000" # 500MB
 CORES_DEFAULT="0"
 
 # Valores atuais (podem ser sobrescritos por CLI)

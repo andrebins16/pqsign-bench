@@ -76,7 +76,7 @@ Opções para 'run':
                          (default: "keygen,sign,verify,all")
   --reps N               Número de repetições (default: 100)
   --sizes "LISTA"        Tamanhos de mensagem em bytes, separados por vírgula (entre aspas)
-                         (default: "10000000, 100000000, 1000000000" = 10MB, 100MB, 1GB)
+                         (default: "256,100000,100000000" = 256 bytes, 100KB, 100MB)
   --outdir DIR           Diretório de saída (default: $"${ROOT}/results")
   --outfile NOME.csv     Nome do arquivo CSV (default: results.csv)
   --trim-pct P           Percentual de trim para estatística (default: 15)
@@ -84,9 +84,9 @@ Opções para 'run':
                          (default: desabilitado) Recomendado ativar.
 
   Opções do runexec:
-  --timelimit VAL        Limite de tempo de CPU em segundos (default: 25s)
-  --walltimelimit VAL    Limite de tempo de parede em segundos (default: 30s)
-  --memlimit VAL         Limite de memória em bytes (default: 4294967296 = 4 GB)
+  --timelimit VAL        Limite de tempo de CPU em segundos (default: 5s)
+  --walltimelimit VAL    Limite de tempo de parede em segundos (default: 6s)
+  --memlimit VAL         Limite de memória em bytes (default: 500000000 = 500MB)
   --cores "LISTA"        Lista de cores a usar (entre aspas se múltiplos)
                          Ex: 0 ou "0,2-3" (default: "0")
 
@@ -219,6 +219,6 @@ python3 src/plot.py FINALRESULTSUBUNTU
 
 sudo ./scripts/setup_cpu_performance.sh
 
-src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --sizes "256,10000,10000000" --timelimit 30 --walltimelimit 35
+src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --timelimit 35 --walltimelimit 36
 
 python src/plot.py FINALRESULTSBERRYPI
