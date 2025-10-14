@@ -17,18 +17,18 @@ PREP="${BUILD_DIR}/bench_prep"
 
 # Defaults
 ALGS_DEFAULT="sphincsshake256ssimple,sphincsshake256fsimple,sphincsshake192ssimple,sphincsshake192fsimple,sphincsshake128ssimple,sphincsshake128fsimple,sphincssha2256ssimple,sphincssha2256fsimple,sphincssha2192ssimple,sphincssha2192fsimple,sphincssha2128ssimple,sphincssha2128fsimple,mldsa87,mldsa65,mldsa44,falcon512,falcon1024,RSA,EC"
-OPS_DEFAULT="keygen,sign,verify,all"
-REPS_DEFAULT=100
-SIZES_DEFAULT="10000000, 100000000, 1000000000"
+OPS_DEFAULT="all"
+REPS_DEFAULT=10
+SIZES_DEFAULT="256,100000,100000000"
 OUTDIR_DEFAULT="${ROOT}/results"
 OUTFILE_DEFAULT="results.csv"
 TRIM_PCT_DEFAULT=15
 BASELINE_DEFAULT=0
 
 # Opções do runexec - Defaults para Ubuntu
-TIMELIMIT_DEFAULT="25"
-WALLTIMELIMIT_DEFAULT="30"
-MEMLIMIT_DEFAULT="4294967296" # 4GB
+TIMELIMIT_DEFAULT=""
+WALLTIMELIMIT_DEFAULT=""
+MEMLIMIT_DEFAULT="" # 4GB
 CORES_DEFAULT="0"
 
 # Valores atuais (podem ser sobrescritos por CLI)
@@ -341,7 +341,7 @@ calculate_statistics() {
 write_csv_header() {
     local csv_file="$1"
     if [[ ! -s "$csv_file" ]]; then
-        echo "algorithm,operation,size,reps,trim_pct,trim_wall_s_raw,std_wall_s_raw,trim_cpu_s_raw,std_cpu_s_raw,trim_wall_s_base,std_wall_s_base,trim_cpu_s_base,std_cpu_s_base,net_wall_s,std_net_wall_s,net_cpu_s,std_net_cpu_s,trim_mem_mb,std_mem_mb" > "$csv_file"
+        echo "algorithm,operation,size,reps,trim_pct,trim_wall_s_raw,std_wall_s_raw,trim_cpu_s_raw,std_cpu_s_raw,trim_wall_s_base,std_wall_s_base,trim_cpu_s_base,std_cpu_s_base,net_wall_s,std_net_wall_s,net_cpu_s,std_net_cpu_s,trim_mem_mb_raw,std_mem_mb_raw,trim_mem_mb_base,std_mem_mb_base,net_mem_mb,std_net_mem_mb" > "$csv_file"
     fi
 }
 
@@ -600,10 +600,11 @@ cmd_run() {
                 done
 
                 # Execuções BASELINE (se habilitado)
-                local wall_file_baseline cpu_file_baseline
+                local wall_file_baseline cpu_file_baseline mem_file_baseline
                 if [[ "$BASELINE" -eq 1 ]]; then
                     wall_file_baseline="$(mktemp)"
                     cpu_file_baseline="$(mktemp)"
+                    mem_file_baseline="$(mktemp)"
                     
                     for ((rep=1; rep<=REPS; rep++)); do
                         local -a cmd_args_baseline
@@ -625,48 +626,56 @@ cmd_run() {
                                 ;;
                         esac
 
-                        read -r exit_code wall_time cpu_time _ < <( run_single_benchmark "${cmd_args_baseline[@]}" )
+                        read -r exit_code wall_time cpu_time mem_mb < <( run_single_benchmark "${cmd_args_baseline[@]}" )
                         
                         [[ "$wall_time" =~ ^[0-9] ]] && echo "$wall_time" >> "$wall_file_baseline"
                         [[ "$cpu_time"  =~ ^[0-9] ]] && echo "$cpu_time"  >> "$cpu_file_baseline"
+                        [[ "$mem_mb"    =~ ^[0-9] ]] && echo "$mem_mb"    >> "$mem_file_baseline"
                     done
                 fi
 
-                # Cálculo de estatísticas
+# Cálculo de estatísticas
                 read -r mean_wall_raw std_wall_raw _ < <( calculate_statistics "$wall_file_raw" "$TRIM_PCT" )
                 read -r mean_cpu_raw std_cpu_raw _ < <( calculate_statistics "$cpu_file_raw" "$TRIM_PCT" )
-                read -r mean_mem std_mem _ < <( calculate_statistics "$mem_file_raw" "$TRIM_PCT" )
+                read -r mean_mem_raw std_mem_raw _ < <( calculate_statistics "$mem_file_raw" "$TRIM_PCT" )
 
-                local mean_wall_baseline std_wall_baseline mean_cpu_baseline std_cpu_baseline
-                local net_wall std_net_wall net_cpu std_net_cpu
+                local mean_wall_baseline std_wall_baseline mean_cpu_baseline std_cpu_baseline mean_mem_baseline std_mem_baseline
+                local net_wall std_net_wall net_cpu std_net_cpu net_mem std_net_mem
                 
                 if [[ "$BASELINE" -eq 1 ]]; then
                     read -r mean_wall_baseline std_wall_baseline _ < <( calculate_statistics "$wall_file_baseline" "$TRIM_PCT" )
                     read -r mean_cpu_baseline std_cpu_baseline _ < <( calculate_statistics "$cpu_file_baseline" "$TRIM_PCT" )
+                    read -r mean_mem_baseline std_mem_baseline _ < <( calculate_statistics "$mem_file_baseline" "$TRIM_PCT" )
                     
                     # Calcula métricas NET (RAW - BASELINE)
                     net_wall="$(calculate_difference "$mean_wall_raw" "$mean_wall_baseline")"
                     net_cpu="$(calculate_difference "$mean_cpu_raw" "$mean_cpu_baseline")"
+                    net_mem="$(calculate_difference "$mean_mem_raw" "$mean_mem_baseline")"
                     std_net_wall="$(calculate_quadrature_std "$std_wall_raw" "$std_wall_baseline")"
                     std_net_cpu="$(calculate_quadrature_std "$std_cpu_raw" "$std_cpu_baseline")"
+                    std_net_mem="$(calculate_quadrature_std "$std_mem_raw" "$std_mem_baseline")"
                 else
                     mean_wall_baseline="NaN"
                     std_wall_baseline="NaN"
                     mean_cpu_baseline="NaN"
                     std_cpu_baseline="NaN"
+                    mean_mem_baseline="NaN"
+                    std_mem_baseline="NaN"
                     net_wall="NaN"
                     std_net_wall="NaN"
                     net_cpu="NaN"
                     std_net_cpu="NaN"
+                    net_mem="NaN"
+                    std_net_mem="NaN"
                 fi
 
                 # Escreve linha no CSV
-                echo "${algorithm},${operation},${msg_size},${REPS},${TRIM_PCT},${mean_wall_raw},${std_wall_raw},${mean_cpu_raw},${std_cpu_raw},${mean_wall_baseline},${std_wall_baseline},${mean_cpu_baseline},${std_cpu_baseline},${net_wall},${std_net_wall},${net_cpu},${std_net_cpu},${mean_mem},${std_mem}" >> "$result_csv"
+                echo "${algorithm},${operation},${msg_size},${REPS},${TRIM_PCT},${mean_wall_raw},${std_wall_raw},${mean_cpu_raw},${std_cpu_raw},${mean_wall_baseline},${std_wall_baseline},${mean_cpu_baseline},${std_cpu_baseline},${net_wall},${std_net_wall},${net_cpu},${std_net_cpu},${mean_mem_raw},${std_mem_raw},${mean_mem_baseline},${std_mem_baseline},${net_mem},${std_net_mem}" >> "$result_csv"
 
                 # Limpeza de temporários
                 rm -f "$wall_file_raw" "$cpu_file_raw" "$mem_file_raw"
                 if [[ "$BASELINE" -eq 1 ]]; then
-                    rm -f "$wall_file_baseline" "$cpu_file_baseline"
+                    rm -f "$wall_file_baseline" "$cpu_file_baseline" "$mem_file_baseline"
                 fi
 
                 echo "[benchmark] ${algorithm}/${operation}/${msg_size} -> ${REPS} repetições"

@@ -247,8 +247,10 @@ def main():
         # NET
         "net_wall_s","std_net_wall_s",
         "net_cpu_s","std_net_cpu_s",
-        # MEM (RAW)
-        "trim_mem_mb","std_mem_mb"
+        # MEM
+        "trim_mem_mb_raw","std_mem_mb_raw",
+        "trim_mem_mb_base","std_mem_mb_base",
+        "net_mem_mb","std_net_mem_mb"
     ])
 
     # Conversão de unidade para tempos
@@ -267,12 +269,14 @@ def main():
     # BASE/NET podem ser todos NaN quando baseline não foi rodado
     has_base = False
     has_net = False
-    if "trim_wall_s_base" in df.columns or "trim_cpu_s_base" in df.columns:
+    if "trim_wall_s_base" in df.columns or "trim_cpu_s_base" in df.columns or "trim_mem_mb_base" in df.columns:
         has_base = (df.get("trim_wall_s_base", pd.Series(dtype=float)).notna().any() or
-                    df.get("trim_cpu_s_base", pd.Series(dtype=float)).notna().any())
-    if "net_wall_s" in df.columns or "net_cpu_s" in df.columns:
+                    df.get("trim_cpu_s_base", pd.Series(dtype=float)).notna().any() or
+                    df.get("trim_mem_mb_base", pd.Series(dtype=float)).notna().any())
+    if "net_wall_s" in df.columns or "net_cpu_s" in df.columns or "net_mem_mb" in df.columns:
         has_net = (df.get("net_wall_s", pd.Series(dtype=float)).notna().any() or
-                   df.get("net_cpu_s", pd.Series(dtype=float)).notna().any())
+                   df.get("net_cpu_s", pd.Series(dtype=float)).notna().any() or
+                   df.get("net_mem_mb", pd.Series(dtype=float)).notna().any())
 
     if has_base:
         df["wall_base_val"] = df["trim_wall_s_base"] * t_factor
@@ -289,9 +293,9 @@ def main():
     # Diretórios: criamos apenas o necessário
     groups = ["wall_raw", "cpu_raw", "mem_raw"]
     if has_base:
-        groups += ["wall_base", "cpu_base"]
+        groups += ["wall_base", "cpu_base", "mem_base"]
     if has_net:
-        groups += ["wall_net", "cpu_net"]
+        groups += ["wall_net", "cpu_net", "mem_net"]
     ensure_dirs(outdir, groups)
     ensure_subtables_dirs(subtables_base, groups)
 
@@ -423,16 +427,50 @@ def main():
             out_path = os.path.join(outdir, group, f"bench_{op}_{size}_{group}.png")
             plot_hbar(
                 sub_df=sub_for_plot,
-                value_col="trim_mem_mb",
-                err_col="std_mem_mb",
+                value_col="trim_mem_mb_raw",
+                err_col="std_mem_mb_raw",
                 ylabel_col="alg",
-                title=f"{title_base} — {get_metric_suffix('mem')}",
+                title=f"{title_base} — Pico de Memória (RAW)",
                 xlabel="Memória (MB)",
                 out_path=out_path,
                 system_label=system_label
             )
             out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
-            write_subtable_csv(sub_for_plot, "alg", "trim_mem_mb", "std_mem_mb", out_csv)
+            write_subtable_csv(sub_for_plot, "alg", "trim_mem_mb_raw", "std_mem_mb_raw", out_csv)
+
+            # MEM BASE (se existir)
+            if has_base:
+                group = "mem_base"
+                out_path = os.path.join(outdir, group, f"bench_{op}_{size}_{group}.png")
+                plot_hbar(
+                    sub_df=sub_for_plot,
+                    value_col="trim_mem_mb_base",
+                    err_col="std_mem_mb_base",
+                    ylabel_col="alg",
+                    title=f"{title_base} — Pico de Memória (BASELINE)",
+                    xlabel="Memória (MB)",
+                    out_path=out_path,
+                    system_label=system_label
+                )
+                out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
+                write_subtable_csv(sub_for_plot, "alg", "trim_mem_mb_base", "std_mem_mb_base", out_csv)
+
+            # MEM NET (se existir)
+            if has_net:
+                group = "mem_net"
+                out_path = os.path.join(outdir, group, f"bench_{op}_{size}_{group}.png")
+                plot_hbar(
+                    sub_df=sub_for_plot,
+                    value_col="net_mem_mb",
+                    err_col="std_net_mem_mb",
+                    ylabel_col="alg",
+                    title=f"{title_base} — Pico de Memória (NET)",
+                    xlabel="Memória (MB)",
+                    out_path=out_path,
+                    system_label=system_label
+                )
+                out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
+                write_subtable_csv(sub_for_plot, "alg", "net_mem_mb", "std_net_mem_mb", out_csv)
 
     return 0
 
