@@ -345,7 +345,7 @@ write_csv_header() {
     fi
 }
 
-# Calcula composição de incerteza (quadratura) - "dois desvios padrões se acumulam"
+# Calcula composição de incerteza via quadratura
 calculate_quadrature_std() {
     local std_a="$1"
     local std_b="$2"

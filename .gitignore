@@ -6,9 +6,3 @@ logs/
 fixtures/
 tags/
 *.log
-plots/
-*.png
-results/
-*.csv
-*.json
-*/system_label.txt
