@@ -9,6 +9,4 @@ tags/
 plots/
 *.png
 results/
-*.csv
-*.json
 */system_label.txt
