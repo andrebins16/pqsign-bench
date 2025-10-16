@@ -1,0 +1,1 @@
+Cortex-A53 | Debian GNU/Linux 12 (bookworm)
