@@ -134,9 +134,9 @@ def get_hatch_for_algorithm(alg_name):
     hatches = {
         'classical': '///',     
         'nist1':     '...',     
-        'nist2':     '+++',     
+        'nist2':     '|||',     
         'nist3':     'xxx',     
-        'nist5':     '|||',     
+        'nist5':     '+++',     
         'other':     '---'     
     }
 
@@ -196,11 +196,11 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
     # Monta legenda apenas com categorias presentes (na ordem correta)
     from matplotlib.patches import Patch
     all_legend_elements = [
-        ('classical', Patch(facecolor='#E53935', edgecolor='black', hatch='///', label='Clássico (vulnerável)')),
+        ('classical', Patch(facecolor='#E53935', edgecolor='black', hatch='///', label='Clássico')),
         ('nist1',     Patch(facecolor='#FB8C00', edgecolor='black', hatch='...', label='PQC Nível 1')),
-        ('nist2',     Patch(facecolor='#FDD835', edgecolor='black', hatch='+++', label='PQC Nível 2')),
+        ('nist2',     Patch(facecolor='#FDD835', edgecolor='black', hatch='|||', label='PQC Nível 2')),
         ('nist3',     Patch(facecolor='#7CB342', edgecolor='black', hatch='xxx', label='PQC Nível 3')),
-        ('nist5',     Patch(facecolor='#2E7D32', edgecolor='black', hatch='|||', label='PQC Nível 5')),
+        ('nist5',     Patch(facecolor='#2E7D32', edgecolor='black', hatch='+++', label='PQC Nível 5')),
         ('other',     Patch(facecolor='#9E9E9E', edgecolor='black', hatch='---', label='Outros')),
     ]
     
