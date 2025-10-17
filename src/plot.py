@@ -125,6 +125,23 @@ def get_color_for_algorithm(alg_name):
     
     return colors.get(category, '#9E9E9E')
 
+def get_hatch_for_algorithm(alg_name):
+    """
+    Retorna o padrão de textura baseado na categoria do algoritmo
+    """
+    category = get_algorithm_category(alg_name)
+
+    hatches = {
+        'classical': '///',     
+        'nist1':     '...',     
+        'nist2':     '+++',     
+        'nist3':     'xxx',     
+        'nist5':     '|||',     
+        'other':     '---'     
+    }
+
+    return hatches.get(category, '')
+
 
 def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, system_label=None):
     if sub_df.empty or value_col not in sub_df.columns:
@@ -144,11 +161,20 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
     y = range(len(sub_df))
     errs = sub_df[err_col].fillna(0.0).values if err_col in sub_df.columns else [0.0] * len(sub_df)
     
-    # Cores baseadas nos algoritmos
+    # Cores e texturas baseadas nos algoritmos
     colors = [get_color_for_algorithm(alg) for alg in sub_df[ylabel_col].tolist()]
+    hatches = [get_hatch_for_algorithm(alg) for alg in sub_df[ylabel_col].tolist()]
 
     fig, ax = plt.subplots(figsize=(10, max(6, len(sub_df) * 0.3)))
-    ax.barh(list(y), sub_df[value_col].values, xerr=errs, capsize=4, color=colors, edgecolor='black', linewidth=0.5)
+    
+    # Cria barras com cores e texturas
+    bars = ax.barh(list(y), sub_df[value_col].values, xerr=errs, capsize=4, 
+                   color=colors, edgecolor='black', linewidth=0.8)
+    
+    # Aplica texturas individualmente a cada barra
+    for bar, hatch in zip(bars, hatches):
+        bar.set_hatch(hatch)
+    
     ax.set_yticks(list(y))
     ax.set_yticklabels(sub_df[ylabel_col].tolist())
     ax.set_xlabel(xlabel)
@@ -170,12 +196,12 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
     # Monta legenda apenas com categorias presentes (na ordem correta)
     from matplotlib.patches import Patch
     all_legend_elements = [
-        ('classical', Patch(facecolor='#E53935', edgecolor='black', label='Clássico (vulnerável)')),
-        ('nist1',     Patch(facecolor='#FB8C00', edgecolor='black', label='PQC Nível 1')),
-        ('nist2',     Patch(facecolor='#FDD835', edgecolor='black', label='PQC Nível 2')),
-        ('nist3',     Patch(facecolor='#7CB342', edgecolor='black', label='PQC Nível 3')),
-        ('nist5',     Patch(facecolor='#2E7D32', edgecolor='black', label='PQC Nível 5')),
-        ('other',     Patch(facecolor='#9E9E9E', edgecolor='black', label='Outros')),
+        ('classical', Patch(facecolor='#E53935', edgecolor='black', hatch='///', label='Clássico (vulnerável)')),
+        ('nist1',     Patch(facecolor='#FB8C00', edgecolor='black', hatch='...', label='PQC Nível 1')),
+        ('nist2',     Patch(facecolor='#FDD835', edgecolor='black', hatch='+++', label='PQC Nível 2')),
+        ('nist3',     Patch(facecolor='#7CB342', edgecolor='black', hatch='xxx', label='PQC Nível 3')),
+        ('nist5',     Patch(facecolor='#2E7D32', edgecolor='black', hatch='|||', label='PQC Nível 5')),
+        ('other',     Patch(facecolor='#9E9E9E', edgecolor='black', hatch='---', label='Outros')),
     ]
     
     # Filtra apenas as categorias presentes
