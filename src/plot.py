@@ -24,14 +24,6 @@ def ensure_subtables_dirs(base_dir, groups):
 def order_by_first_occurrence(values):
     return list(OrderedDict.fromkeys(values))
 
-def load_system_label(results_dir):
-    """Carrega o system label do arquivo system_label.txt"""
-    label_path = os.path.join(results_dir, "system_label.txt")
-    if os.path.isfile(label_path):
-        with open(label_path, 'r') as f:
-            return f.read().strip()
-    return None
-
 def get_operation_title(op, size):
     """Retorna título em português para a operação"""
     op_names = {
@@ -64,11 +56,13 @@ def get_metric_suffix(metric_type):
     suffixes = {
         "raw_wall": "Tempo Total de Parede",
         "raw_cpu": "Tempo Total de CPU",
+        "raw_mem": "Pico de Memória Total",
         "base_wall": "Overhead de Tempo de Parede",
         "base_cpu": "Overhead de Tempo de CPU",
+        "base_mem": "Overhead de Pico de Memória",
         "net_wall": "Tempo Líquido de Parede",
         "net_cpu": "Tempo Líquido de CPU",
-        "mem": "Pico de Memória"
+        "net_mem": "Pico de Memória Líquido"
     }
     return suffixes.get(metric_type, "")
 
@@ -142,13 +136,29 @@ def get_hatch_for_algorithm(alg_name):
 
     return hatches.get(category, '')
 
+def _format_num(x, unit):
+    """Formata número"""
+    if pd.isna(x): 
+        return ""
+    ax = abs(x)
+    if unit in ("ms", "s", "MB"):
+        s = f"{x:.2f}" if ax < 10 else (f"{x:.1f}" if ax < 100 else f"{x:.0f}")
+        return s.rstrip("0").rstrip(".")
+    s = f"{x:.3f}"
+    return s.rstrip("0").rstrip(".")
 
-def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, system_label=None):
+def _compose_label(val, unit):
+    """Mostra apenas a média e a unidade"""
+    if pd.isna(val):
+        return ""
+    v = _format_num(val, unit)
+    return f"{v} {unit}"
+
+def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, system_label=None, value_unit=""):
     if sub_df.empty or value_col not in sub_df.columns:
         return
-    # se todas as linhas são NaN, não plota
-    vals = sub_df[value_col]
-    if vals.isna().all():
+    vals_series = sub_df[value_col]
+    if vals_series.isna().all():
         return
 
     # ordem de algoritmos pela primeira ocorrência 
@@ -179,17 +189,55 @@ def plot_hbar(sub_df, value_col, err_col, ylabel_col, title, xlabel, out_path, s
     ax.set_yticklabels(sub_df[ylabel_col].tolist())
     ax.set_xlabel(xlabel)
     ax.set_title(title, fontsize=12, fontweight='bold', pad=20)
+
+    # Desliga notação científica no eixo X
+    ax.ticklabel_format(style='plain', axis='x')
+    try:
+        ax.get_xaxis().get_major_formatter().set_scientific(False)
+        ax.get_xaxis().get_major_formatter().set_useOffset(False)
+    except Exception:
+        pass
     
-    # System label discreto abaixo do título, centralizado
     if system_label:
-        ax.text(0.5, 1.02, system_label, 
+        ax.text(0.5, 1.01, system_label, 
                 transform=ax.transAxes,
-                fontsize=8,
-                style='italic',
+                fontsize=13,
+                fontweight='bold',
                 verticalalignment='bottom',
                 horizontalalignment='center',
-                color='gray')
+                color='black')
     
+    # Rótulos numéricos ao lado de cada barra
+    vals = sub_df[value_col].fillna(0.0).values
+    errs_arr = errs
+    # Calcula xlim incluindo erro + margem para não cortar rótulos
+    max_width = 0.0
+    for v, e in zip(vals, errs_arr):
+        ev = e if e is not None and not pd.isna(e) else 0.0
+        vv = v if v is not None and not pd.isna(v) else 0.0
+        if vv + ev > max_width:
+            max_width = vv + ev
+    if max_width <= 0:
+        max_width = max(vals) if len(vals) else 1.0
+    ax.set_xlim(left=0, right=max_width * 1.15)
+
+    ax.margins(x=0.02)
+
+    for i, (bar, val) in enumerate(zip(bars, vals)):
+        if pd.isna(val):
+            continue
+        err_val = errs_arr[i] if i < len(errs_arr) else 0.0
+        if pd.isna(err_val):
+            err_val = 0.0
+        label = _compose_label(val, value_unit)
+        if not label:
+            continue
+        x_min, x_max = ax.get_xlim()
+        margin = 0.01 * (x_max - x_min)
+        x = bar.get_width() + float(err_val) + margin
+        ymid = bar.get_y() + bar.get_height() / 2
+        ax.text(x, ymid, label, va='center', ha='left', fontsize=8)
+
     # Detecta quais categorias estão presentes no gráfico
     categories_present = set(get_algorithm_category(alg) for alg in sub_df[ylabel_col].tolist())
     
@@ -238,6 +286,8 @@ def main():
     ap.add_argument("results_dir", help="Diretório contendo results.csv")
     ap.add_argument("--time-unit", choices=["s", "ms"], default="ms",
                     help="Unidade para tempos (default: ms)")
+    ap.add_argument("--env-name", default=None,
+                    help="Nome do ambiente executado (ex.: 'Ubuntu', 'Raspberry Pi 3B'); será acrescentado no fim do título.")
     args = ap.parse_args()
 
     # Monta o path do CSV: results_dir/results.csv
@@ -248,10 +298,9 @@ def main():
 
     df = pd.read_csv(csv_path)
 
-    # Carrega system label
-    system_label = load_system_label(args.results_dir)
-    if system_label:
-        print(f"System label: {system_label}")
+    composed_label = None
+    if args.env_name:
+        composed_label = args.env_name
 
     # Sempre salva em <results_dir>/plots e subtabelas em <results_dir>/plots/subTables
     outdir = os.path.join(os.path.normpath(args.results_dir), "plots")
@@ -345,6 +394,8 @@ def main():
 
             # Título base em português
             title_base = get_operation_title(op, size)
+            # Sufixo do ambiente
+            env_suffix = f" — {args.env_name}" if args.env_name else ""
 
             # WALL RAW
             group = "wall_raw"
@@ -358,7 +409,8 @@ def main():
                 title=f"{title_base} — {get_metric_suffix('raw_wall')}",
                 xlabel=f"Tempo ({t_label})",
                 out_path=out_path,
-                system_label=system_label
+                system_label=composed_label,
+                value_unit=t_label
             )
             # subtable
             out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
@@ -376,7 +428,8 @@ def main():
                     title=f"{title_base} — {get_metric_suffix('base_wall')}",
                     xlabel=f"Tempo ({t_label})",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit=t_label
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "wall_base_val", "wall_base_err", out_csv)
@@ -393,7 +446,8 @@ def main():
                     title=f"{title_base} — {get_metric_suffix('net_wall')}",
                     xlabel=f"Tempo ({t_label})",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit=t_label
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "wall_net_val", "wall_net_err", out_csv)
@@ -409,7 +463,8 @@ def main():
                 title=f"{title_base} — {get_metric_suffix('raw_cpu')}",
                 xlabel=f"Tempo ({t_label})",
                 out_path=out_path,
-                system_label=system_label
+                system_label=composed_label,
+                value_unit=t_label
             )
             out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
             write_subtable_csv(sub_for_plot, "alg", "cpu_raw_val", "cpu_raw_err", out_csv)
@@ -426,7 +481,8 @@ def main():
                     title=f"{title_base} — {get_metric_suffix('base_cpu')}",
                     xlabel=f"Tempo ({t_label})",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit=t_label
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "cpu_base_val", "cpu_base_err", out_csv)
@@ -443,7 +499,8 @@ def main():
                     title=f"{title_base} — {get_metric_suffix('net_cpu')}",
                     xlabel=f"Tempo ({t_label})",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit=t_label
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "cpu_net_val", "cpu_net_err", out_csv)
@@ -456,10 +513,11 @@ def main():
                 value_col="trim_mem_mb_raw",
                 err_col="std_mem_mb_raw",
                 ylabel_col="alg",
-                title=f"{title_base} — Pico de Memória (RAW)",
+                title=f"{title_base} — {get_metric_suffix('raw_mem')}",
                 xlabel="Memória (MB)",
                 out_path=out_path,
-                system_label=system_label
+                system_label=composed_label,
+                value_unit="MB"
             )
             out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
             write_subtable_csv(sub_for_plot, "alg", "trim_mem_mb_raw", "std_mem_mb_raw", out_csv)
@@ -473,10 +531,11 @@ def main():
                     value_col="trim_mem_mb_base",
                     err_col="std_mem_mb_base",
                     ylabel_col="alg",
-                    title=f"{title_base} — Pico de Memória (BASELINE)",
+                    title=f"{title_base} — {get_metric_suffix('base_mem')}",
                     xlabel="Memória (MB)",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit="MB"
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "trim_mem_mb_base", "std_mem_mb_base", out_csv)
@@ -490,10 +549,11 @@ def main():
                     value_col="net_mem_mb",
                     err_col="std_net_mem_mb",
                     ylabel_col="alg",
-                    title=f"{title_base} — Pico de Memória (NET)",
+                    title=f"{title_base} — {get_metric_suffix('net_mem')}",
                     xlabel="Memória (MB)",
                     out_path=out_path,
-                    system_label=system_label
+                    system_label=composed_label,
+                    value_unit="MB"
                 )
                 out_csv = os.path.join(subtables_base, group, f"bench_{op}_{size}_{group}.csv")
                 write_subtable_csv(sub_for_plot, "alg", "net_mem_mb", "std_net_mem_mb", out_csv)

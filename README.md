@@ -208,7 +208,7 @@ sudo ./scripts/setup_cpu_performance.sh
 
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSUBUNTU
 
-python3 src/plot.py FINALRESULTSUBUNTU
+python3 src/plot.py FINALRESULTSUBUNTU --env-name "Notebook Ubuntu"
 
 ### Raspberry Pi 3B:
 ./scripts/pi_00_setup_deps.sh
@@ -221,4 +221,4 @@ sudo ./scripts/setup_cpu_performance.sh
 
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --timelimit 35 --walltimelimit 36
 
-python src/plot.py FINALRESULTSBERRYPI
+python src/plot.py FINALRESULTSBERRYPI --env-name "Raspberry Pi 3B"
