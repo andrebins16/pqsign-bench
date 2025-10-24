@@ -158,7 +158,7 @@ NET: tempo líquido das primitivas (RAW - BASE)
 ## Gerar Gráficos
 
 ### Gera gráficos a partir dos resultados
-python3 src/plot.py resultsdir
+python3 src/plot.py resultsdir --env-name <nomeAmbiente>
 
 ### Estrutura de Saída
 Após a execução, o script gera dois conjuntos de saídas dentro do diretório de resultados (results_dir):
@@ -171,8 +171,10 @@ results_dir/
 │   ├── mem_raw/
 │   ├── wall_base/      # Se usou --baseline
 │   ├── cpu_base/       # Se usou --baseline
+|   ├── mem_base/       # Se usou --baseline
 │   ├── wall_net/       # Se usou --baseline
-│   └── cpu_net/        # Se usou --baseline
+|   ├── cpu_net/        # Se usou --baseline
+│   └── mem_net/        # Se usou --baseline
 │
 └── subTables/
     ├── wall_raw/
@@ -180,8 +182,10 @@ results_dir/
     ├── mem_raw/
     ├── wall_base/      # Se usou --baseline
     ├── cpu_base/       # Se usou --baseline
+    ├── mem_base/       # Se usou --baseline    
     ├── wall_net/       # Se usou --baseline
-    └── cpu_net/        # Se usou --baseline
+    ├── cpu_net/       # Se usou --baseline
+    └── mem_net/        # Se usou --baseline
 ```
 
 ## Conteúdo Gerado
