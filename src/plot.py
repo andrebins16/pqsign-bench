@@ -137,15 +137,14 @@ def get_hatch_for_algorithm(alg_name):
     return hatches.get(category, '')
 
 def _format_num(x, unit):
-    """Formata número"""
-    if pd.isna(x): 
+    if pd.isna(x):
         return ""
     ax = abs(x)
     if unit in ("ms", "s", "MB"):
         s = f"{x:.2f}" if ax < 10 else (f"{x:.1f}" if ax < 100 else f"{x:.0f}")
-        return s.rstrip("0").rstrip(".")
+        return s if "." not in s else s.rstrip("0").rstrip(".")
     s = f"{x:.3f}"
-    return s.rstrip("0").rstrip(".")
+    return s if "." not in s else s.rstrip("0").rstrip(".")
 
 def _compose_label(val, unit):
     """Mostra apenas a média e a unidade"""
