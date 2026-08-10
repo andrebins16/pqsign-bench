@@ -228,5 +228,5 @@ src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --timelimit
 python src/plot.py FINALRESULTSBERRYPI --env-name "Raspberry Pi 3B"
 
 
-# 5. Artigo
+# 6. Artigo
 O documento final do trabalho de conclusão pode ser encontrado em https://github.com/andrebins16/pqsign-bench/blob/main/Algoritmos_de_criptografia__avalia%C3%A7%C3%A3o_e_compara%C3%A7%C3%A3o_de_recursos_p%C3%B3s_qu%C3%A2nticos.pdf****
