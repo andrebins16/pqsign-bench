@@ -1,6 +1,6 @@
 # PQSig-Bench
 
-Plataforma de benchmark para algoritmos de assinatura digital pós-quânticos usando C, liboqs, oqs-provider, OpenSSL e BenchExec.
+Plataforma de benchmark para algoritmos de assinatura digital pós-quânticos usando C, liboqs, oqs-provider, OpenSSL e BenchExec. O documento final do trabalho de conclusão pode ser encontrado em https://github.com/andrebins16/pqsign-bench/blob/main/Algoritmos_de_criptografia__avalia%C3%A7%C3%A3o_e_compara%C3%A7%C3%A3o_de_recursos_p%C3%B3s_qu%C3%A2nticos.pdf
 
 ## Visão Geral
 
@@ -226,3 +226,7 @@ sudo ./scripts/setup_cpu_performance.sh
 src/scripts/run_bench.sh run --baseline --outdir FINALRESULTSBERRYPI --timelimit 35 --walltimelimit 36
 
 python src/plot.py FINALRESULTSBERRYPI --env-name "Raspberry Pi 3B"
+
+
+# 5. Artigo
+O documento final do trabalho de conclusão pode ser encontrado em https://github.com/andrebins16/pqsign-bench/blob/main/Algoritmos_de_criptografia__avalia%C3%A7%C3%A3o_e_compara%C3%A7%C3%A3o_de_recursos_p%C3%B3s_qu%C3%A2nticos.pdf****
